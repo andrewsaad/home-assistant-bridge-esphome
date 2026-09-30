@@ -1376,6 +1376,20 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             if domain == 'number' and e.get('min_val') == e.get('max_val'):
                 continue
 
+            # A writable domain with no command path is rejected by Home
+            # Assistant ("required key not provided at 'command_topic'"): the
+            # bridge emits command_topic only from a command_template or a
+            # paired ERD. Sub-fields of multi-field ERDs cannot be written
+            # without a read-modify-write of the whole ERD, so publish anything
+            # without a command path read-only. Runs after the validity skips
+            # above so it only converts entities that were already published.
+            mode, opts = e['mode'], e['options_json']
+            if not e['command_template'] and not e['paired_erd_id']:
+                if domain == 'switch':
+                    domain = 'binary_sensor'
+                elif domain in ('number', 'select', 'text'):
+                    domain, mode, opts = 'sensor', '', ''
+
             obj: Dict[str, Any] = {
                 'i': f'{e["erd_id"]:04x}',
                 'n': e['name'],
@@ -1395,9 +1409,9 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             if e['pair_role']:                    obj['r']  = e['pair_role']
             if e['value_template']:               obj['vt'] = e['value_template']
             if e['command_template']:             obj['ct'] = e['command_template']
-            if e['options_json']:                 obj['o']  = e['options_json']
+            if opts:                              obj['o']  = opts
             if e['field_id']:                     obj['fi'] = e['field_id']
-            if e['mode']:                         obj['m']  = e['mode']
+            if mode:                              obj['m']  = mode
             if e['payload_on']:                   obj['pon'] = e['payload_on']
             if e['payload_off']:                  obj['poff'] = e['payload_off']
             if e['state_on']:                     obj['son'] = e['state_on']
