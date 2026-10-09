@@ -119,6 +119,25 @@ class TestJSONLStructure(unittest.TestCase):
                     f'{seen[key]} and {obj["n"]}')
             seen[key] = obj['n']
 
+    def test_writable_domains_have_command_path(self):
+        """Every switch/number/select has a command path (ct or paired ERD).
+
+        The bridge emits command_topic only from these; without it Home
+        Assistant rejects the discovery payload ("required key not provided
+        at 'command_topic'") and the entity never appears.
+        """
+        for obj in self.entities:
+            if obj['d'] not in ('switch', 'number', 'select'):
+                continue
+            with self.subTest(entity=obj['n'], erd=obj['i']):
+                self.assertTrue('ct' in obj or 'p' in obj,
+                    f'{obj["n"]} ({obj["i"]}) is a {obj["d"]} with no command path')
+
+    def test_uncommandable_switch_published_read_only(self):
+        """A bare switch with no command path becomes a binary_sensor."""
+        ui_lock = [o for o in self.entities if o['i'] == '0004' and not o.get('fi')]
+        self.assertEqual([o['d'] for o in ui_lock], ['binary_sensor'])
+
     def test_total_entity_count(self):
         """Verify total entity count is reasonable (not zero, not excessive)."""
         self.assertGreater(len(self.entities), 5000,
